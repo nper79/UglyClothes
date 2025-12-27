@@ -89,8 +89,8 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   const beforeDesc = storyData.before_outfit_desc;
   const afterDesc = storyData.after_outfit_desc;
 
-  // CONSISTENCY: Define the phone once to use in all prompts
-  const consistentPhone = "Silver iPhone 15 Pro Max with a plain grey silicone case";
+  // CONSISTENCY: Use a standard black phone which is easiest for AI to replicate consistently
+  const consistentPhone = "Black iPhone 15 Pro Max";
 
   // Shared technical specs
   const techSpecs = `STYLE: Ultra photorealistic, raw smartphone photo, authentic texture. Camera: iPhone Pro main sensor, f/1.8. NO text overlays, NO watermarks, NO camera app UI elements.`;
@@ -111,8 +111,10 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
     VIBE: Tired, stuck. ${techSpecs}`,
 
     // Slide 3: Twist (Detail Selfie)
+    // FIX: Ensure face is top half, empty space at bottom for text
     `Artistic Mirror Selfie Detail. Keep exact face.
-    FOCUS: Extreme close-up in mirror on eyes or hand touching fabric/hair. ${consistentPhone} partially visible.
+    FOCUS: Close-up on eyes/face in the TOP HALF of the image. Hand touching face. ${consistentPhone} partially visible.
+    COMPOSITION: Leave the bottom third of the image relatively empty/dark for text overlay.
     LIGHTING: Dim, moody, chiaroscuro.
     VIBE: Realization. ${techSpecs}`,
 
@@ -189,15 +191,16 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
       textPos = 'top';
       badgePos = 'bottom-right';
     } 
-    // Slide 2 (Close up) - Face is very high, keep Text Bottom, Badge Top Left (or even Bottom Left if Top Left covers hair)
+    // Slide 2 (Close up) - Face is very high, keep Text Bottom, Badge Top Left
     else if (i === 1) {
        textPos = 'bottom';
        badgePos = 'top-left';
     }
-    // Slide 3 (Detail) - Abstract
+    // Slide 3 (Twist/Detail) - User requested Text Bottom. 
+    // Image prompt was adjusted to keep face in top half.
     else if (i === 2) {
-      textPos = 'middle';
-      badgePos = 'bottom-right';
+      textPos = 'bottom'; 
+      badgePos = 'top-right';
     }
 
     return {
