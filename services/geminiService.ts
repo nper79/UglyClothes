@@ -16,56 +16,65 @@ export const openApiKeySelection = async (): Promise<void> => {
 };
 
 /**
- * Generates the narrative text for the 8-slide stylist story.
+ * Generates the narrative text AND visual descriptions for the 8-slide stylist story.
  */
 const generateStoryNarrative = async (ai: any): Promise<any> => {
-  // Use Pro model for better JSON structure adherence and to avoid loops
+  // Use Pro model for complex creative direction
   const model = 'gemini-3-pro-preview';
   
   const response = await ai.models.generateContent({
     model,
-    contents: `You are an expert Personal Stylist creating a TikTok/Instagram story about a client's transformation.
-    Create a fictional client persona (Portuguese name like Joana, Sofia, Maria).
+    contents: `You are an expert Personal Stylist and Creative Director creating a TikTok/Instagram story about a client's transformation.
     
-    The story follows this exact 8-slide flow:
-    1. Problem: The struggle (e.g., "Always felt invisible...").
-    2. Wrong Belief: What she thought was wrong (e.g., "Thought I just needed more black clothes...").
-    3. The Twist: The realization (e.g., "But it wasn't the color, it was the fit.").
-    4. The Principle: The theory (e.g., "We focused on structure and fabrics.").
-    5. The Process: Trying things on (e.g., "Testing new shapes...").
-    6. The Result: The final look (e.g., "Finally feeling like myself.").
-    7. Insight: A final thought (e.g., "Confidence is the best outfit.").
-    8. CTA: Call to action (e.g., "Ready for your change? Link in bio.").
+    1. CREATE A PERSONA: Portuguese name (e.g., Joana, Sofia, Matilde).
+    
+    2. THE STORY FLOW (8 Slides):
+       Slide 1 (Problem): Mirror selfie showing the struggle.
+       Slide 2 (Belief): Close-up/Sad showing the wrong mindset.
+       Slide 3 (Twist): Artistic portrait showing realization.
+       Slide 4 (Principle): ACTION SHOT. Shopping, choosing fabrics, or browsing. NOT A SELFIE.
+       Slide 5 (Process): Fitting room selfie, testing new things.
+       Slide 6 (Result 1): Amazing outfit in a great location.
+       Slide 7 (Result 2): Front camera selfie, happy.
+       Slide 8 (Result 3): Full body mirror selfie, ready to go out.
 
-    CRITICAL INSTRUCTIONS:
-    - Define 3 VISUALLY DISTINCT "AFTER" OUTFITS for slides 6, 7, and 8. 
-    - KEEP CAPTIONS CONCISE (Max 15 words each).
-    - KEEP DESCRIPTIONS CONCISE (Max 40 words each) to prevent generation errors.
-    - Output STRICTLY VALID JSON.
-    - Do NOT use markdown code blocks.
+    3. VISUAL RANDOMIZATION (CRITICAL):
+       - Do NOT use the same bedroom background for every slide.
+       - Vary locations: Living room, Hallway, Vintage Store, High-end Boutique, Street (Lisbon vibes), Cafe, Park.
+       - Vary lighting: Golden hour, Window light, Indoor warm, Neon vibe.
+       - Slide 4 MUST be a shopping/selection scene, but vary the setting (Vintage store, Mall, Boutique).
 
-    Output JSON with the following structure:
+    4. OUTFITS:
+       - Define 2 DISTINCT "Before" outfits. Both must be "dull", "ill-fitting" or "boring", but DIFFERENT from each other (e.g., Slide 1: Baggy Sweats; Slide 2: Old Oversized Pajamas).
+       - Define 3 DISTINCT "After" outfits (e.g., Office Chic, Date Night, Weekend Cool).
+
+    Output STRICTLY VALID JSON with this structure:
     {
       "name": "Client Name",
-      "captions": ["Caption 1", "Caption 2", "Caption 3", "Caption 4", "Caption 5", "Caption 6", "Caption 7", "Caption 8"],
-      "before_outfit_desc": "Visual description of 'Before' outfit: Casual, comfortable but unstyled. MUST BE: A vintage Rock Band T-shirt, an oversized Adidas logo tee, or a graphic print shirt. Paired with ill-fitting jeans or sweatpants.",
-      "after_outfit_1_desc": "Slide 6 Outfit: A specific distinct look (e.g. Tailored Trousers & Silk Blouse).",
-      "after_outfit_2_desc": "Slide 7 Outfit: A completely different look (e.g. Midi Dress & Knit Cardigan).",
-      "after_outfit_3_desc": "Slide 8 Outfit: Another different look (e.g. Statement Jacket, Jeans & Boots)."
+      "captions": ["Text for slide 1", ..., "Text for slide 8"],
+      "visual_scenes": [
+         "Description of visual for Slide 1 (Environment, Lighting, Pose)",
+         "Description of visual for Slide 2",
+         ... (8 total)
+      ],
+      "before_outfit_1_desc": "Visual description of Slide 1 outfit (Dull/Messy)",
+      "before_outfit_2_desc": "Visual description of Slide 2 outfit (Dull/Messy - DIFFERENT from #1)",
+      "after_outfit_1_desc": "Visual description...",
+      "after_outfit_2_desc": "Visual description...",
+      "after_outfit_3_desc": "Visual description..."
     }`,
     config: {
       responseMimeType: "application/json",
-      maxOutputTokens: 4096, // Reduced to prevent infinite text loops
-      temperature: 0.4, // Lower temperature for more deterministic structure
+      maxOutputTokens: 8192,
+      temperature: 0.8, // Higher temperature for CREATIVITY and VARIETY
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           name: { type: Type.STRING },
-          captions: { 
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          },
-          before_outfit_desc: { type: Type.STRING },
+          captions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          visual_scenes: { type: Type.ARRAY, items: { type: Type.STRING } },
+          before_outfit_1_desc: { type: Type.STRING },
+          before_outfit_2_desc: { type: Type.STRING },
           after_outfit_1_desc: { type: Type.STRING },
           after_outfit_2_desc: { type: Type.STRING },
           after_outfit_3_desc: { type: Type.STRING }
@@ -76,14 +85,9 @@ const generateStoryNarrative = async (ai: any): Promise<any> => {
 
   // Clean and parse JSON safely
   let text = response.text || "{}";
-  
-  // Remove markdown code blocks if present
   text = text.replace(/```json/g, '').replace(/```/g, '');
-  
-  // Robust extraction: find the first '{' and the last '}'
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  
   if (start !== -1 && end !== -1 && end > start) {
     text = text.substring(start, end + 1);
   }
@@ -91,24 +95,34 @@ const generateStoryNarrative = async (ai: any): Promise<any> => {
   try {
     return JSON.parse(text);
   } catch (e) {
-    console.warn("JSON parse failed, using fallback narrative. Error:", e);
-    // Return a rich fallback object so the user experience is NOT interrupted
+    console.warn("JSON parse failed, using fallback narrative.", e);
     return {
-      name: "Sofia",
+      name: "Ana",
       captions: [
-        "Sempre me senti invisível com as minhas roupas.",
-        "Achava que usar preto era a única solução.",
-        "Mas percebi que o segredo não é a cor, é o corte.",
-        "Focámos em estrutura e tecidos de qualidade.",
-        "Experimentar novas formas mudou tudo.",
-        "Finalmente sinto-me eu própria!",
-        "A confiança é mesmo o melhor outfit.",
-        "Pronta para a tua transformação? Link na bio."
+        "Sentia-me sempre 'apagada' e sem estilo.",
+        "Escondia-me em roupas largas e escuras.",
+        "O problema não era o meu corpo, eram as escolhas.",
+        "Descobrimos que a estrutura certa muda tudo.",
+        "Testar novos cortes foi assustador mas vital.",
+        "Agora olho para o espelho e sorrio.",
+        "Não é vaidade, é amor próprio.",
+        "Vamos descobrir a tua melhor versão? DM me."
       ],
-      before_outfit_desc: "Oversized vintage Pink Floyd band t-shirt and grey baggy sweatpants",
-      after_outfit_1_desc: "Chic beige trench coat over white tee and straight leg jeans",
-      after_outfit_2_desc: "Emerald green midi silk slip dress with a blazer",
-      after_outfit_3_desc: "Structured leather jacket with tailored black trousers"
+      visual_scenes: [
+        "Mirror selfie in a slightly messy hallway, dim lighting, looking down.",
+        "Close up mirror selfie in a bathroom, harsh overhead light, looking tired.",
+        "Artistic portrait, hand touching face, moody lighting.",
+        "Candid shot from behind of woman browsing rails in a vintage clothing store.",
+        "Mirror selfie in a bright department store fitting room, piles of clothes behind.",
+        "Mirror selfie in a sunny living room, golden hour light hitting the face.",
+        "Front facing camera selfie outdoors with a blurred street background.",
+        "Full body mirror selfie in an elevator or modern lobby, confident pose."
+      ],
+      before_outfit_1_desc: "Baggy grey sweatpants and a faded black oversized t-shirt",
+      before_outfit_2_desc: "Worn out navy blue pajamas with a loose cardigan",
+      after_outfit_1_desc: "White linen blazer with high-waisted jeans",
+      after_outfit_2_desc: "Floral midi dress with a denim jacket",
+      after_outfit_3_desc: "All-black chic jumpsuit with statement belt"
     };
   }
 };
@@ -117,7 +131,7 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const imageModel = 'gemini-3-pro-image-preview';
 
-  // 1. Generate the Text Narrative
+  // 1. Generate the Text Narrative & Creative Direction
   const storyData = await generateStoryNarrative(ai);
   const base64Data = base64Image.split(',')[1];
   const commonConfig = { imageConfig: { aspectRatio: "9:16" } };
@@ -135,83 +149,80 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
     });
   };
 
-  // 2. Define Prompts for 8 Slides
-  // Safely access properties with defaults
-  const beforeDesc = storyData.before_outfit_desc || "Oversized vintage band t-shirt and loose jeans";
-  const afterDesc1 = storyData.after_outfit_1_desc || "Stylish tailored look";
-  const afterDesc2 = storyData.after_outfit_2_desc || "Elegant chic look";
-  const afterDesc3 = storyData.after_outfit_3_desc || "Bold statement look";
-  
-  // Safely access captions array
-  const captions = Array.isArray(storyData.captions) ? storyData.captions : [];
-
-  // CONSISTENCY: Use a standard black phone which is easiest for AI to replicate consistently
+  // 2. Construct Dynamic Prompts
   const consistentPhone = "Black iPhone 15 Pro Max";
-
-  // Shared technical specs
   const techSpecs = `STYLE: Ultra photorealistic, raw smartphone photo, authentic texture. Camera: iPhone Pro main sensor, f/1.8. NO text overlays, NO watermarks, NO camera app UI elements.`;
 
+  // Fallbacks if AI misses a field
+  const visuals = storyData.visual_scenes || [];
+  const before1 = storyData.before_outfit_1_desc || "Casual grey sweats and tee";
+  const before2 = storyData.before_outfit_2_desc || "Old oversized hoodie and leggings";
+  const after1 = storyData.after_outfit_1_desc || "Chic blazer and jeans";
+  const after2 = storyData.after_outfit_2_desc || "Elegant dress";
+  const after3 = storyData.after_outfit_3_desc || "Stylish jumpsuit";
+
   const prompts = [
-    // Slide 1: Problem (Before - Mirror Selfie - Bedroom)
-    `Mirror Selfie. Keep exact face of the woman in this photo. OUTFIT: ${beforeDesc}. 
-    POSE: Standing stiffly in front of a mirror, holding a ${consistentPhone}. 
-    ENVIRONMENT: Bedroom with lived-in clutter (clothes on a chair, unmade bed) but clean walls and floor. NOT dirty/filthy.
-    LIGHTING: Indoor bedroom lighting. 
-    VIBE: "Before" photo, casual, slightly unstyled. ${techSpecs}`,
+    // Slide 1: Problem (Mirror Selfie - Dynamic Loc - Outfit 1)
+    `Mirror Selfie. Keep exact face of the woman in this photo.
+     OUTFIT: ${before1}.
+     SCENE DESCRIPTION: ${visuals[0] || "Bedroom, slightly messy, dim light"}.
+     POSE: Standing stiffly, holding ${consistentPhone}, looking unsure.
+     VIBE: Before transformation, low confidence. ${techSpecs}`,
 
-    // Slide 2: Wrong Belief (Before - Close Selfie - Bathroom)
-    `Close-up Mirror Selfie (Waist up). Keep exact face. OUTFIT: ${beforeDesc}.
-    POSE: Holding ${consistentPhone} closer to mirror, looking at screen.
-    ENVIRONMENT: Home bathroom mirror. Tiled walls, domestic lighting, maybe a toothbrush holder or towels visible in background.
-    LIGHTING: Overhead bathroom lighting (slightly harsh/yellow).
-    VIBE: Tired, stuck. ${techSpecs}`,
+    // Slide 2: Belief (Close Up - Dynamic Loc - Outfit 2)
+    `Close-up Mirror Selfie (Waist up). Keep exact face.
+     OUTFIT: ${before2} (MUST BE DIFFERENT from previous slide, but still dull/boring).
+     SCENE DESCRIPTION: ${visuals[1] || "Bathroom mirror, harsh light"}.
+     POSE: Holding ${consistentPhone} close to face/chest.
+     VIBE: Tired, analyzing flaws. ${techSpecs}`,
 
-    // Slide 3: Twist (Detail Selfie)
-    // FIX: Ensure face is top half, empty space at bottom for text
-    `Artistic Mirror Selfie Detail. Keep exact face.
-    FOCUS: Close-up on eyes/face in the TOP HALF of the image. Hand touching face. ${consistentPhone} partially visible.
-    COMPOSITION: Leave the bottom third of the image relatively empty/dark for text overlay.
-    LIGHTING: Dim, moody, chiaroscuro.
-    VIBE: Realization. ${techSpecs}`,
+    // Slide 3: Twist (Detail - Dynamic Loc)
+    // FIX: Changed "Detail" to "Portrait" and added crop protection instructions
+    `Artistic Portrait Reflection in a Mirror. Keep exact face.
+     FRAMING: Head and shoulders shot. DO NOT CROP THE HEAD. Ensure headroom above the hair.
+     FOCUS: Emotional expression, hand near face (optional).
+     SCENE DESCRIPTION: ${visuals[2] || "Dim moody lighting, artistic shadow"}.
+     COMPOSITION: Center the face in the upper 2/3 of the image. Leave negative space at the bottom for text.
+     VIBE: Realization, intimacy. ${techSpecs}`,
 
-    // Slide 4: Principle (Shopping - Candid)
-    `Candid medium shot of the woman browsing clothes in a clothing store. Keep exact face.
-    ACTION: She is sorting through hangers on a rack, focused on fabrics.
-    ANGLE: Slightly from the side/behind, as if taken by a friend accompanying her.
-    ENVIRONMENT: Fashion store interior with blurred racks in background.
-    VIBE: Casual shopping trip, searching for the new style. ${techSpecs}`,
+    // Slide 4: Principle (Shopping/Browsing - CANDID - Dynamic Loc)
+    `Candid photo of the woman shopping/browsing. Keep exact face.
+     ACTION: Looking at clothes, fabrics, or holding a hanger. NOT A SELFIE.
+     SCENE DESCRIPTION: ${visuals[3] || "Clothing store, browsing racks"}.
+     ANGLE: Taken by a friend (side view or 3/4 view).
+     VIBE: Discovery, process, shopping. ${techSpecs}`,
 
-    // Slide 5: Process (Fitting Room Selfie)
+    // Slide 5: Process (Fitting Room - Dynamic Loc)
     `Mirror Selfie in a Fitting Room. Keep exact face.
-    OUTFIT: Wearing elements of "${afterDesc1}" mixed with basic items (like a plain white tee).
-    POSE: Evaluating the fit, holding ${consistentPhone}.
-    ENVIRONMENT: Department store changing room.
-    VIBE: Work in progress. ${techSpecs}`,
+     OUTFIT: Wearing parts of "${after1}" mixed with basics.
+     SCENE DESCRIPTION: ${visuals[4] || "Department store fitting room, clothes on hook"}.
+     POSE: Evaluating fit, holding ${consistentPhone}.
+     VIBE: Trying things on, work in progress. ${techSpecs}`,
 
-    // Slide 6: Result (After 1 - Golden Hour Selfie)
-    `Aesthetic Mirror Selfie. Keep exact face. OUTFIT: ${afterDesc1} (DISTINCT LOOK 1).
-    POSE: Confident "Outfit Check" pose, angled torso. Holding ${consistentPhone}.
-    ENVIRONMENT: Clean, stylish bedroom.
-    LIGHTING: Direct hard sunlight (Golden Hour), sun-drenched.
-    VIBE: Glow up, radiant. ${techSpecs}`,
+    // Slide 6: Result 1 (Mirror Selfie - Dynamic Loc)
+    `Aesthetic Mirror Selfie. Keep exact face.
+     OUTFIT: ${after1}.
+     SCENE DESCRIPTION: ${visuals[5] || "Living room with sunlight"}.
+     POSE: Confident outfit check, angled body, holding ${consistentPhone}.
+     VIBE: Glow up, confident. ${techSpecs}`,
 
-    // Slide 7: Insight (After 2 - Front Camera Selfie)
-    `Front-facing Camera Selfie. Keep exact face. OUTFIT: ${afterDesc2} (DISTINCT LOOK 2).
-    POSE: Looking directly at camera, genuine soft smile.
-    BACKGROUND: Blurred simple background.
-    LIGHTING: Soft flattering natural light.
-    VIBE: Confidence, happiness. ${techSpecs}`,
+    // Slide 7: Result 2 (Front Camera - Dynamic Loc)
+    `Front-facing Camera Selfie. Keep exact face.
+     OUTFIT: ${after2}.
+     SCENE DESCRIPTION: ${visuals[6] || "Outdoor street background, blurred"}.
+     POSE: Looking at camera, genuine smile.
+     VIBE: Happy, radiant. ${techSpecs}`,
 
-    // Slide 8: CTA (After 3 - Dynamic Selfie)
-    `Full-body Mirror Selfie (Final Look). Keep exact face. OUTFIT: ${afterDesc3} (DISTINCT LOOK 3).
-    POSE: Ready to leave, bag on shoulder, holding ${consistentPhone} confidently.
-    ENVIRONMENT: Near front door or elevator mirror.
-    LIGHTING: bright and clean.
-    VIBE: Action, ready for the world. ${techSpecs}`
+    // Slide 8: Result 3 (Full Body - Dynamic Loc)
+    `Full-body Mirror Selfie. Keep exact face.
+     OUTFIT: ${after3}.
+     SCENE DESCRIPTION: ${visuals[7] || "Elevator mirror or hotel lobby"}.
+     POSE: Ready to leave, bag on shoulder, holding ${consistentPhone} confidently.
+     VIBE: Complete transformation, powerful. ${techSpecs}`
   ];
 
   // 3. Execute Generations
-  // All slides now feature the person, so we use the ref image for all.
+  // All slides use ref image now for face consistency
   const promises = prompts.map((p) => generateSlideImage(p, true));
   
   const responses = await Promise.all(promises);
@@ -219,41 +230,35 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   // 4. Extract Images
   const images = responses.map((res, index) => {
     const candidate = res?.candidates?.[0];
-    if (!candidate?.content?.parts) {
-      console.warn(`Slide ${index + 1} generation missing candidates.`);
-      return "";
-    }
+    if (!candidate?.content?.parts) return "";
     for (const part of candidate.content.parts) {
       if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     return "";
   });
 
-  if (images.some(img => !img)) throw new Error("Some images could not be generated (Safety/Filter block). Please try again with a clearer photo.");
+  if (images.some(img => !img)) throw new Error("Some images could not be generated. Please try again.");
 
   // 5. Assemble Slides
   const slideTypes: StorySlide['type'][] = ['problem', 'belief', 'twist', 'principle', 'process', 'result', 'insight', 'cta'];
-  
-  // STRATEGY: 
-  // Text Bottom -> Badge Top Left (Safest for selfies where face is center-top)
-  
+  const captions = Array.isArray(storyData.captions) ? storyData.captions : [];
+
   const slides: StorySlide[] = images.map((img, i) => {
     let textPos: StorySlide['textPosition'] = 'bottom';
     let badgePos: StorySlide['badgePosition'] = 'top-left';
 
-    // Slide 3 (Twist/Detail) - User requested Text Bottom. 
-    // Image prompt was adjusted to keep face in top half.
-    if (i === 2) {
-      textPos = 'bottom'; 
+    // Slide 3 usually needs top space for face, so text bottom
+    // Slide 4 (Shopping) often looks better with Text Top if legs/clothes are at bottom
+    if (i === 3) {
+        textPos = 'top';
+        badgePos = 'bottom-right';
+    } else if (i === 2) {
       badgePos = 'top-right';
     }
 
-    // Fallback to empty string or generic text if caption missing
-    const captionText = captions[i] || "";
-
     return {
       image: img,
-      text: captionText,
+      text: captions[i] || "",
       type: slideTypes[i],
       textPosition: textPos,
       badgePosition: badgePos
