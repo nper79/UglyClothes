@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import JSZip from 'jszip';
 import { 
   AppTabs, 
   AppState, 
@@ -12,7 +13,8 @@ import {
   generateImage, 
   analyzeImage, 
   checkApiKey, 
-  openApiKeySelection 
+  openApiKeySelection,
+  generateAveragePersona
 } from './services/geminiService';
 
 const IconStory = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>;
@@ -20,6 +22,7 @@ const IconMagic = () => <svg className="w-5 h-5" fill="none" stroke="currentColo
 const IconPlus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
 const IconSearch = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
 const IconUpload = () => <svg className="w-12 h-12 text-amber-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>;
+const IconDownload = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -36,6 +39,8 @@ const App: React.FC = () => {
   });
 
   const [hasKey, setHasKey] = useState<boolean>(true);
+  const [zipping, setZipping] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string>("");
 
   useEffect(() => {
     checkApiKey().then(setHasKey);
@@ -66,12 +71,26 @@ const App: React.FC = () => {
     }
 
     setState(prev => ({ ...prev, loading: true, error: null, processedImage: null, storyResult: null, analysisResult: null }));
-    
+    setStatusMessage("");
+
     try {
       switch (state.activeTab) {
         case AppTabs.STORY:
-          if (!state.originalImage) throw new Error("Please upload an image first.");
-          const story = await generateStylistStory(state.originalImage);
+          let sourceImage = state.originalImage;
+          
+          if (!sourceImage) {
+            setStatusMessage("Generating base persona (Average Jane)...");
+            try {
+              sourceImage = await generateAveragePersona();
+              // Update state so the user sees the generated persona immediately
+              setState(prev => ({ ...prev, originalImage: sourceImage }));
+            } catch (err) {
+              throw new Error("Failed to generate base persona. Please try uploading a photo.");
+            }
+          }
+
+          setStatusMessage("Designing wardrobe & writing story...");
+          const story = await generateStylistStory(sourceImage);
           setState(prev => ({ ...prev, storyResult: story }));
           break;
         case AppTabs.EDIT:
@@ -93,6 +112,39 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, error: err.message || "An unexpected error occurred." }));
     } finally {
       setState(prev => ({ ...prev, loading: false }));
+      setStatusMessage("");
+    }
+  };
+
+  const downloadAllSlides = async () => {
+    if (!state.storyResult) return;
+    
+    setZipping(true);
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("banana-studio-story");
+      
+      state.storyResult.slides.forEach((slide, index) => {
+        // Base64 string looks like "data:image/png;base64,..."
+        const base64Data = slide.image.split(',')[1];
+        folder?.file(`slide-${index + 1}-${slide.type}.png`, base64Data, { base64: true });
+      });
+
+      const content = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
+      const url = URL.createObjectURL(content);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${state.storyResult.storyData.name}-stylist-story.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to zip files", error);
+    } finally {
+      setZipping(false);
     }
   };
 
@@ -119,6 +171,15 @@ const App: React.FC = () => {
       case 'bottom-right': return 'bottom-4 right-4';
       default: return 'top-4 left-4';
     }
+  };
+
+  // Determine if the main action button should be enabled
+  const isButtonEnabled = () => {
+    if (state.loading) return false;
+    // Allow generate story without image (we will create one)
+    if (state.activeTab === AppTabs.STORY) return true;
+    if (state.activeTab === AppTabs.GENERATE) return true;
+    return !!state.originalImage;
   };
 
   return (
@@ -180,15 +241,20 @@ const App: React.FC = () => {
                   <li><strong>Slide 3-5:</strong> The Twist & Process (Theory/Testing)</li>
                   <li><strong>Slide 6-8:</strong> The Result & Insight (After)</li>
                 </ul>
+                {!state.originalImage && (
+                  <p className="mt-4 text-amber-500 text-xs font-semibold">
+                    * No image? We'll generate an average-looking persona for you.
+                  </p>
+                )}
               </div>
             )}
 
             <button 
               onClick={handleAction}
-              disabled={state.loading || (!state.originalImage && state.activeTab !== AppTabs.GENERATE)}
+              disabled={!isButtonEnabled()}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-xl font-bold text-zinc-950 transition-all flex items-center justify-center gap-2"
             >
-              {state.loading ? "Creating Full Story..." : "Generate Makeover Story"}
+              {state.loading ? (statusMessage || "Processing...") : "Generate Makeover Story"}
             </button>
 
             {state.error && <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm">{state.error}</div>}
@@ -196,15 +262,31 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 glass rounded-3xl border border-zinc-800 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-zinc-800 bg-zinc-900/20">
+          <div className="p-4 border-b border-zinc-800 bg-zinc-900/20 flex justify-between items-center">
             <h2 className="text-zinc-300 font-semibold tracking-wide uppercase text-xs">Visual Results</h2>
+            {state.storyResult && (
+              <button 
+                onClick={downloadAllSlides}
+                disabled={zipping}
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-lg text-xs font-bold uppercase hover:bg-amber-500 hover:text-black transition-colors disabled:opacity-50"
+              >
+                {zipping ? (
+                  <span>Zipping...</span>
+                ) : (
+                  <>
+                    <IconDownload />
+                    Download All (ZIP)
+                  </>
+                )}
+              </button>
+            )}
           </div>
           
           <div className="flex-1 relative flex flex-col items-center justify-center p-6 bg-[#0d0d0d] overflow-y-auto">
             {state.loading ? (
               <div className="flex flex-col items-center gap-4">
                 <div className="w-16 h-16 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin"></div>
-                <p className="text-amber-500 font-medium animate-pulse">Designing new wardrobe & writing 8-part story...</p>
+                <p className="text-amber-500 font-medium animate-pulse">{statusMessage || "Working magic..."}</p>
               </div>
             ) : state.storyResult ? (
               <div className="w-full h-full flex items-center overflow-x-auto pb-4 gap-6 px-4">
@@ -237,7 +319,7 @@ const App: React.FC = () => {
                       download={`story-slide-${index+1}.png`}
                       className="absolute bottom-4 right-4 p-3 bg-amber-500 text-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      <IconDownload />
                     </a>
                   </div>
                 ))}
