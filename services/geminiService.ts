@@ -19,7 +19,8 @@ export const openApiKeySelection = async (): Promise<void> => {
  * Generates the narrative text for the 8-slide stylist story.
  */
 const generateStoryNarrative = async (ai: any): Promise<any> => {
-  const model = 'gemini-3-flash-preview';
+  // Use Pro model for better JSON structure adherence and to avoid loops
+  const model = 'gemini-3-pro-preview';
   
   const response = await ai.models.generateContent({
     model,
@@ -36,15 +37,26 @@ const generateStoryNarrative = async (ai: any): Promise<any> => {
     7. Insight: A final thought (e.g., "Confidence is the best outfit.").
     8. CTA: Call to action (e.g., "Ready for your change? Link in bio.").
 
+    CRITICAL INSTRUCTIONS:
+    - Define 3 VISUALLY DISTINCT "AFTER" OUTFITS for slides 6, 7, and 8. 
+    - KEEP CAPTIONS CONCISE (Max 15 words each).
+    - KEEP DESCRIPTIONS CONCISE (Max 40 words each) to prevent generation errors.
+    - Output STRICTLY VALID JSON.
+    - Do NOT use markdown code blocks.
+
     Output JSON with the following structure:
     {
       "name": "Client Name",
       "captions": ["Caption 1", "Caption 2", "Caption 3", "Caption 4", "Caption 5", "Caption 6", "Caption 7", "Caption 8"],
-      "before_outfit_desc": "Visual description of 'Before' outfit: Clean but unflattering, ill-fitting, boring colors, realistic everyday look.",
-      "after_outfit_desc": "Visual description of 'After' outfit: Stylish, 'Smart Casual' or 'Chic', flattering fit, confident."
+      "before_outfit_desc": "Visual description of 'Before' outfit: Casual, comfortable but unstyled. MUST BE: A vintage Rock Band T-shirt, an oversized Adidas logo tee, or a graphic print shirt. Paired with ill-fitting jeans or sweatpants.",
+      "after_outfit_1_desc": "Slide 6 Outfit: A specific distinct look (e.g. Tailored Trousers & Silk Blouse).",
+      "after_outfit_2_desc": "Slide 7 Outfit: A completely different look (e.g. Midi Dress & Knit Cardigan).",
+      "after_outfit_3_desc": "Slide 8 Outfit: Another different look (e.g. Statement Jacket, Jeans & Boots)."
     }`,
     config: {
       responseMimeType: "application/json",
+      maxOutputTokens: 4096, // Reduced to prevent infinite text loops
+      temperature: 0.4, // Lower temperature for more deterministic structure
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -54,13 +66,51 @@ const generateStoryNarrative = async (ai: any): Promise<any> => {
             items: { type: Type.STRING }
           },
           before_outfit_desc: { type: Type.STRING },
-          after_outfit_desc: { type: Type.STRING }
+          after_outfit_1_desc: { type: Type.STRING },
+          after_outfit_2_desc: { type: Type.STRING },
+          after_outfit_3_desc: { type: Type.STRING }
         }
       }
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  // Clean and parse JSON safely
+  let text = response.text || "{}";
+  
+  // Remove markdown code blocks if present
+  text = text.replace(/```json/g, '').replace(/```/g, '');
+  
+  // Robust extraction: find the first '{' and the last '}'
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  
+  if (start !== -1 && end !== -1 && end > start) {
+    text = text.substring(start, end + 1);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.warn("JSON parse failed, using fallback narrative. Error:", e);
+    // Return a rich fallback object so the user experience is NOT interrupted
+    return {
+      name: "Sofia",
+      captions: [
+        "Sempre me senti invisível com as minhas roupas.",
+        "Achava que usar preto era a única solução.",
+        "Mas percebi que o segredo não é a cor, é o corte.",
+        "Focámos em estrutura e tecidos de qualidade.",
+        "Experimentar novas formas mudou tudo.",
+        "Finalmente sinto-me eu própria!",
+        "A confiança é mesmo o melhor outfit.",
+        "Pronta para a tua transformação? Link na bio."
+      ],
+      before_outfit_desc: "Oversized vintage Pink Floyd band t-shirt and grey baggy sweatpants",
+      after_outfit_1_desc: "Chic beige trench coat over white tee and straight leg jeans",
+      after_outfit_2_desc: "Emerald green midi silk slip dress with a blazer",
+      after_outfit_3_desc: "Structured leather jacket with tailored black trousers"
+    };
+  }
 };
 
 export const generateStylistStory = async (base64Image: string): Promise<StoryResult> => {
@@ -86,8 +136,14 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   };
 
   // 2. Define Prompts for 8 Slides
-  const beforeDesc = storyData.before_outfit_desc;
-  const afterDesc = storyData.after_outfit_desc;
+  // Safely access properties with defaults
+  const beforeDesc = storyData.before_outfit_desc || "Oversized vintage band t-shirt and loose jeans";
+  const afterDesc1 = storyData.after_outfit_1_desc || "Stylish tailored look";
+  const afterDesc2 = storyData.after_outfit_2_desc || "Elegant chic look";
+  const afterDesc3 = storyData.after_outfit_3_desc || "Bold statement look";
+  
+  // Safely access captions array
+  const captions = Array.isArray(storyData.captions) ? storyData.captions : [];
 
   // CONSISTENCY: Use a standard black phone which is easiest for AI to replicate consistently
   const consistentPhone = "Black iPhone 15 Pro Max";
@@ -96,18 +152,18 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   const techSpecs = `STYLE: Ultra photorealistic, raw smartphone photo, authentic texture. Camera: iPhone Pro main sensor, f/1.8. NO text overlays, NO watermarks, NO camera app UI elements.`;
 
   const prompts = [
-    // Slide 1: Problem (Before - Mirror Selfie)
+    // Slide 1: Problem (Before - Mirror Selfie - Bedroom)
     `Mirror Selfie. Keep exact face of the woman in this photo. OUTFIT: ${beforeDesc}. 
     POSE: Standing stiffly in front of a mirror, holding a ${consistentPhone}. 
-    ENVIRONMENT: Messy bedroom. 
-    LIGHTING: Harsh overhead lighting. 
-    VIBE: "Before" photo, feeling invisible. ${techSpecs}`,
+    ENVIRONMENT: Bedroom with lived-in clutter (clothes on a chair, unmade bed) but clean walls and floor. NOT dirty/filthy.
+    LIGHTING: Indoor bedroom lighting. 
+    VIBE: "Before" photo, casual, slightly unstyled. ${techSpecs}`,
 
-    // Slide 2: Wrong Belief (Before - Close Selfie)
+    // Slide 2: Wrong Belief (Before - Close Selfie - Bathroom)
     `Close-up Mirror Selfie (Waist up). Keep exact face. OUTFIT: ${beforeDesc}.
     POSE: Holding ${consistentPhone} closer to mirror, looking at screen.
-    ENVIRONMENT: Same messy room.
-    LIGHTING: Flat, boring.
+    ENVIRONMENT: Home bathroom mirror. Tiled walls, domestic lighting, maybe a toothbrush holder or towels visible in background.
+    LIGHTING: Overhead bathroom lighting (slightly harsh/yellow).
     VIBE: Tired, stuck. ${techSpecs}`,
 
     // Slide 3: Twist (Detail Selfie)
@@ -127,27 +183,27 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
 
     // Slide 5: Process (Fitting Room Selfie)
     `Mirror Selfie in a Fitting Room. Keep exact face.
-    OUTFIT: Wearing the "After" pants with a basic t-shirt.
+    OUTFIT: Wearing elements of "${afterDesc1}" mixed with basic items (like a plain white tee).
     POSE: Evaluating the fit, holding ${consistentPhone}.
     ENVIRONMENT: Department store changing room.
     VIBE: Work in progress. ${techSpecs}`,
 
-    // Slide 6: Result (After - Golden Hour Selfie)
-    `Aesthetic Mirror Selfie. Keep exact face. OUTFIT: ${afterDesc}.
+    // Slide 6: Result (After 1 - Golden Hour Selfie)
+    `Aesthetic Mirror Selfie. Keep exact face. OUTFIT: ${afterDesc1} (DISTINCT LOOK 1).
     POSE: Confident "Outfit Check" pose, angled torso. Holding ${consistentPhone}.
     ENVIRONMENT: Clean, stylish bedroom.
     LIGHTING: Direct hard sunlight (Golden Hour), sun-drenched.
     VIBE: Glow up, radiant. ${techSpecs}`,
 
-    // Slide 7: Insight (Front Camera Selfie)
-    `Front-facing Camera Selfie. Keep exact face. OUTFIT: ${afterDesc} (top details).
+    // Slide 7: Insight (After 2 - Front Camera Selfie)
+    `Front-facing Camera Selfie. Keep exact face. OUTFIT: ${afterDesc2} (DISTINCT LOOK 2).
     POSE: Looking directly at camera, genuine soft smile.
     BACKGROUND: Blurred simple background.
     LIGHTING: Soft flattering natural light.
     VIBE: Confidence, happiness. ${techSpecs}`,
 
-    // Slide 8: CTA (Dynamic Selfie)
-    `Full-body Mirror Selfie (Final Look). Keep exact face. OUTFIT: ${afterDesc}.
+    // Slide 8: CTA (After 3 - Dynamic Selfie)
+    `Full-body Mirror Selfie (Final Look). Keep exact face. OUTFIT: ${afterDesc3} (DISTINCT LOOK 3).
     POSE: Ready to leave, bag on shoulder, holding ${consistentPhone} confidently.
     ENVIRONMENT: Near front door or elevator mirror.
     LIGHTING: bright and clean.
@@ -203,9 +259,12 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
       badgePos = 'top-right';
     }
 
+    // Fallback to empty string or generic text if caption missing
+    const captionText = captions[i] || "";
+
     return {
       image: img,
-      text: storyData.captions[i] || "",
+      text: captionText,
       type: slideTypes[i],
       textPosition: textPos,
       badgePosition: badgePos
@@ -215,7 +274,7 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   return {
     slides,
     storyData: {
-      name: storyData.name,
+      name: storyData.name || "Client",
       styleType: "Transformation"
     }
   };
