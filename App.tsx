@@ -7,7 +7,7 @@ import {
   AspectRatio 
 } from './types';
 import { 
-  generateDualLook, 
+  generateStylistStory, 
   editImageWithPrompt, 
   generateImage, 
   analyzeImage, 
@@ -15,7 +15,7 @@ import {
   openApiKeySelection 
 } from './services/geminiService';
 
-const IconSwap = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
+const IconStory = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>;
 const IconMagic = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z" /></svg>;
 const IconPlus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
 const IconSearch = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
@@ -25,10 +25,10 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     originalImage: null,
     processedImage: null,
-    dualResult: null,
+    storyResult: null,
     loading: false,
     error: null,
-    activeTab: AppTabs.SWAP,
+    activeTab: AppTabs.STORY,
     prompt: '',
     selectedSize: '1K',
     selectedAR: '1:1',
@@ -50,7 +50,7 @@ const App: React.FC = () => {
           ...prev, 
           originalImage: reader.result as string, 
           processedImage: null, 
-          dualResult: null,
+          storyResult: null,
           analysisResult: null 
         }));
       };
@@ -65,14 +65,14 @@ const App: React.FC = () => {
       return;
     }
 
-    setState(prev => ({ ...prev, loading: true, error: null, processedImage: null, dualResult: null, analysisResult: null }));
+    setState(prev => ({ ...prev, loading: true, error: null, processedImage: null, storyResult: null, analysisResult: null }));
     
     try {
       switch (state.activeTab) {
-        case AppTabs.SWAP:
+        case AppTabs.STORY:
           if (!state.originalImage) throw new Error("Please upload an image first.");
-          const dual = await generateDualLook(state.originalImage);
-          setState(prev => ({ ...prev, dualResult: dual }));
+          const story = await generateStylistStory(state.originalImage);
+          setState(prev => ({ ...prev, storyResult: story }));
           break;
         case AppTabs.EDIT:
           if (!state.originalImage) throw new Error("Please upload an image first.");
@@ -98,7 +98,7 @@ const App: React.FC = () => {
 
   const TabButton = ({ id, label, icon: Icon }: { id: any, label: string, icon: any }) => (
     <button
-      onClick={() => setState(prev => ({ ...prev, activeTab: id, processedImage: null, dualResult: null, analysisResult: null }))}
+      onClick={() => setState(prev => ({ ...prev, activeTab: id, processedImage: null, storyResult: null, analysisResult: null }))}
       className={`flex items-center gap-2 px-6 py-3 transition-all duration-200 border-b-2 font-medium ${
         state.activeTab === id 
           ? 'border-amber-500 text-amber-500 bg-amber-500/10' 
@@ -127,7 +127,7 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col md:flex-row p-6 gap-6 overflow-hidden">
         <div className="w-full md:w-[400px] flex flex-col gap-6 overflow-y-auto pr-2">
           <nav className="flex flex-wrap border border-zinc-800 rounded-xl overflow-hidden glass">
-            <TabButton id={AppTabs.SWAP} label="Dual Look Swap" icon={IconSwap} />
+            <TabButton id={AppTabs.STORY} label="Stylist Story" icon={IconStory} />
             <TabButton id={AppTabs.EDIT} label="Magic Edit" icon={IconMagic} />
             <TabButton id={AppTabs.GENERATE} label="Create" icon={IconPlus} />
             <TabButton id={AppTabs.ANALYZE} label="Analyze" icon={IconSearch} />
@@ -161,9 +161,14 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {state.activeTab === AppTabs.SWAP && (
+            {state.activeTab === AppTabs.STORY && (
               <div className="text-zinc-400 text-sm leading-relaxed">
-                <p>This mode generates <strong>two</strong> photos: One in the original outfit and one in common, simple clothes.</p>
+                <p><strong>Stylist Mode:</strong> Creates a complete 8-slide makeover story.</p>
+                <ul className="list-disc ml-5 mt-2 space-y-1">
+                  <li><strong>Slide 1-2:</strong> The Problem & Belief (Before)</li>
+                  <li><strong>Slide 3-5:</strong> The Twist & Process (Theory/Testing)</li>
+                  <li><strong>Slide 6-8:</strong> The Result & Insight (After)</li>
+                </ul>
               </div>
             )}
 
@@ -172,7 +177,7 @@ const App: React.FC = () => {
               disabled={state.loading || (!state.originalImage && state.activeTab !== AppTabs.GENERATE)}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-xl font-bold text-zinc-950 transition-all flex items-center justify-center gap-2"
             >
-              {state.loading ? "Processing Steps..." : "Start AI Process"}
+              {state.loading ? "Creating Full Story..." : "Generate Makeover Story"}
             </button>
 
             {state.error && <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm">{state.error}</div>}
@@ -188,35 +193,48 @@ const App: React.FC = () => {
             {state.loading ? (
               <div className="flex flex-col items-center gap-4">
                 <div className="w-16 h-16 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin"></div>
-                <p className="text-amber-500 font-medium animate-pulse">Running complex vision transformations...</p>
+                <p className="text-amber-500 font-medium animate-pulse">Designing new wardrobe & writing 8-part story...</p>
               </div>
-            ) : state.dualResult ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-6xl">
-                <div className="flex flex-col gap-3">
-                  <div className="flex justify-between items-center px-2">
-                    <span className="text-amber-500 font-bold text-sm uppercase tracking-widest">Studio Look (Original Clothes)</span>
-                    <a href={state.dualResult.studio} download="studio-look.png" className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            ) : state.storyResult ? (
+              <div className="w-full h-full flex items-center overflow-x-auto pb-4 gap-6 px-4">
+                 {/* Story Slides Container */}
+                {state.storyResult.slides.map((slide, index) => (
+                  <div key={index} className="flex-shrink-0 relative w-[300px] h-[533px] bg-black rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl group">
+                    <img src={slide.image} className="w-full h-full object-cover" alt={`Slide ${index + 1}`} />
+                    
+                    {/* Text Overlay - Positioned based on slide.textPosition */}
+                    <div className={`absolute w-[85%] ${
+                      slide.textPosition === 'top' 
+                        ? 'top-8 left-1/2 -translate-x-1/2' 
+                        : 'bottom-16 left-1/2 -translate-x-1/2'
+                    }`}>
+                      <div className="bg-white/90 backdrop-blur-sm text-black px-4 py-3 rounded-xl shadow-lg text-center font-semibold text-sm leading-snug">
+                        {slide.text}
+                      </div>
+                    </div>
+
+                    {/* Badge */}
+                    <div className="absolute top-4 right-4 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs font-bold uppercase text-white border border-white/20">
+                      {slide.type}
+                    </div>
+
+                    {/* Download Button */}
+                    <a 
+                      href={slide.image} 
+                      download={`story-slide-${index+1}.png`}
+                      className="absolute bottom-4 right-4 p-3 bg-amber-500 text-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     </a>
                   </div>
-                  <img src={state.dualResult.studio} className="rounded-2xl border border-zinc-800 shadow-2xl w-full object-contain bg-black" />
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div className="flex justify-between items-center px-2">
-                    <span className="text-zinc-400 font-bold text-sm uppercase tracking-widest">Casual Look (Common Clothes)</span>
-                    <a href={state.dualResult.casual} download="casual-look.png" className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    </a>
-                  </div>
-                  <img src={state.dualResult.casual} className="rounded-2xl border border-zinc-800 shadow-2xl w-full object-contain bg-black" />
-                </div>
+                ))}
               </div>
             ) : state.processedImage ? (
               <img src={state.processedImage} className="max-w-full max-h-[70vh] rounded-xl shadow-2xl border border-zinc-800" />
             ) : state.analysisResult ? (
               <div className="max-w-2xl w-full glass p-8 rounded-3xl border border-zinc-800 text-zinc-300 whitespace-pre-wrap">{state.analysisResult}</div>
             ) : (
-              <div className="text-zinc-600 text-center">No results to display. Upload an image to start.</div>
+              <div className="text-zinc-600 text-center">No results to display. Upload an image to start the transformation.</div>
             )}
           </div>
         </div>
