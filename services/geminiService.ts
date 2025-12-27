@@ -89,63 +89,67 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   const beforeDesc = storyData.before_outfit_desc;
   const afterDesc = storyData.after_outfit_desc;
 
-  // Shared technical specs for the "Selfie" aesthetic
-  const techSpecs = "STYLE: Ultra photorealistic, raw smartphone photo, authentic texture, unpolished candid aesthetic. Camera: iPhone Pro main sensor, f/1.8. Visible grain and natural imperfections.";
+  // CONSISTENCY: Define the phone once to use in all prompts
+  const consistentPhone = "Silver iPhone 15 Pro Max with a plain grey silicone case";
+
+  // Shared technical specs
+  const techSpecs = `STYLE: Ultra photorealistic, raw smartphone photo, authentic texture. Camera: iPhone Pro main sensor, f/1.8. NO text overlays, NO watermarks, NO camera app UI elements.`;
 
   const prompts = [
     // Slide 1: Problem (Before - Mirror Selfie)
     `Mirror Selfie. Keep exact face of the woman in this photo. OUTFIT: ${beforeDesc}. 
-    POSE: Standing stiffly in front of a mirror, holding a black smartphone. 
-    ENVIRONMENT: Messy bedroom or cluttered hallway. 
-    LIGHTING: Harsh overhead lighting, unflattering shadows. 
-    VIBE: "Before" photo, feeling invisible, mundane. ${techSpecs}`,
+    POSE: Standing stiffly in front of a mirror, holding a ${consistentPhone}. 
+    ENVIRONMENT: Messy bedroom. 
+    LIGHTING: Harsh overhead lighting. 
+    VIBE: "Before" photo, feeling invisible. ${techSpecs}`,
 
     // Slide 2: Wrong Belief (Before - Close Selfie)
     `Close-up Mirror Selfie (Waist up). Keep exact face. OUTFIT: ${beforeDesc}.
-    POSE: Holding phone closer to mirror, looking at screen with a "meh" expression.
+    POSE: Holding ${consistentPhone} closer to mirror, looking at screen.
     ENVIRONMENT: Same messy room.
     LIGHTING: Flat, boring.
-    VIBE: Tired, stuck, low energy. ${techSpecs}`,
+    VIBE: Tired, stuck. ${techSpecs}`,
 
     // Slide 3: Twist (Detail Selfie)
     `Artistic Mirror Selfie Detail. Keep exact face.
-    FOCUS: Extreme close-up in mirror on eyes or hand touching fabric/hair. Phone partially visible.
+    FOCUS: Extreme close-up in mirror on eyes or hand touching fabric/hair. ${consistentPhone} partially visible.
     LIGHTING: Dim, moody, chiaroscuro.
-    VIBE: Realization, intimacy, changing perspective. ${techSpecs}`,
+    VIBE: Realization. ${techSpecs}`,
 
-    // Slide 4: Principle (Objects - No Person)
-    `Photo of a bed covered in clothes, hangers, and fabric swatches.
-    VIEW: POV looking down at the bed (as if taking a photo of the mess).
+    // Slide 4: Principle (Objects - RAW PHOTO, NO UI)
+    `High angle photo of a bed covered in clothes, hangers, and fabric swatches.
+    IMPORTANT: This is a raw direct photo of the bed, NOT a screenshot of a camera app. DO NOT include any UI, buttons, or text overlays.
+    VIEW: POV looking down at the bed.
     LIGHTING: Natural daylight coming from a window.
     VIBE: Creative planning, organizing, aesthetic mess. ${techSpecs}`,
 
     // Slide 5: Process (Fitting Room Selfie)
     `Mirror Selfie in a Fitting Room. Keep exact face.
-    OUTFIT: Wearing the "After" pants with a basic t-shirt, or holding up a blazer.
-    POSE: Evaluating the fit, looking critical but hopeful. Holding black smartphone.
-    ENVIRONMENT: Department store changing room with multiple mirrors.
-    VIBE: Work in progress, trying things on. ${techSpecs}`,
+    OUTFIT: Wearing the "After" pants with a basic t-shirt.
+    POSE: Evaluating the fit, holding ${consistentPhone}.
+    ENVIRONMENT: Department store changing room.
+    VIBE: Work in progress. ${techSpecs}`,
 
     // Slide 6: Result (After - Golden Hour Selfie)
     `Aesthetic Mirror Selfie. Keep exact face. OUTFIT: ${afterDesc}.
-    POSE: Confident "Outfit Check" pose, angled torso, hand relaxed. Holding black smartphone.
-    ENVIRONMENT: Clean, stylish bedroom or walk-in closet with white wardrobe.
-    LIGHTING: Direct hard sunlight (Golden Hour), sun-drenched, high contrast highlights.
-    VIBE: Glow up, radiant, trendy. ${techSpecs}`,
+    POSE: Confident "Outfit Check" pose, angled torso. Holding ${consistentPhone}.
+    ENVIRONMENT: Clean, stylish bedroom.
+    LIGHTING: Direct hard sunlight (Golden Hour), sun-drenched.
+    VIBE: Glow up, radiant. ${techSpecs}`,
 
     // Slide 7: Insight (Front Camera Selfie)
     `Front-facing Camera Selfie. Keep exact face. OUTFIT: ${afterDesc} (top details).
     POSE: Looking directly at camera, genuine soft smile.
-    BACKGROUND: Blurred simple background (outdoors or nice wall).
+    BACKGROUND: Blurred simple background.
     LIGHTING: Soft flattering natural light.
-    VIBE: Confidence, happiness, "I love this look". ${techSpecs}`,
+    VIBE: Confidence, happiness. ${techSpecs}`,
 
     // Slide 8: CTA (Dynamic Selfie)
     `Full-body Mirror Selfie (Final Look). Keep exact face. OUTFIT: ${afterDesc}.
-    POSE: Ready to leave, bag on shoulder, holding phone confidently high or low angle.
+    POSE: Ready to leave, bag on shoulder, holding ${consistentPhone} confidently.
     ENVIRONMENT: Near front door or elevator mirror.
     LIGHTING: bright and clean.
-    VIBE: Action, ready for the world, "Link in bio" energy. ${techSpecs}`
+    VIBE: Action, ready for the world. ${techSpecs}`
   ];
 
   // 3. Execute Generations
@@ -171,23 +175,39 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
 
   // 5. Assemble Slides
   const slideTypes: StorySlide['type'][] = ['problem', 'belief', 'twist', 'principle', 'process', 'result', 'insight', 'cta'];
-  const textPositions: StorySlide['textPosition'][] = [
-    'bottom', // Problem: Full body, keep text low
-    'top',    // Belief: Close up, keep text high to avoid chin/neck
-    'bottom', // Twist: Abstract, keep low
-    'top',    // Principle: Objects on bed, keep text high
-    'bottom', // Process: Fitting room, keep low
-    'bottom', // Result: Full outfit, keep low
-    'top',    // Insight: Portrait, keep high above head
-    'bottom'  // CTA: Action, keep low
-  ];
   
-  const slides: StorySlide[] = images.map((img, i) => ({
-    image: img,
-    text: storyData.captions[i] || "",
-    type: slideTypes[i],
-    textPosition: textPositions[i]
-  }));
+  // STRATEGY: 
+  // Text Bottom -> Badge Top Left (Safest for selfies where face is center-top)
+  // Text Top -> Badge Bottom Right (For object shots)
+  
+  const slides: StorySlide[] = images.map((img, i) => {
+    let textPos: StorySlide['textPosition'] = 'bottom';
+    let badgePos: StorySlide['badgePosition'] = 'top-left';
+
+    // Special case for Slide 4 (Bed/Objects) - Text Top, Badge Bottom looks better for flat lays
+    if (i === 3) {
+      textPos = 'top';
+      badgePos = 'bottom-right';
+    } 
+    // Slide 2 (Close up) - Face is very high, keep Text Bottom, Badge Top Left (or even Bottom Left if Top Left covers hair)
+    else if (i === 1) {
+       textPos = 'bottom';
+       badgePos = 'top-left';
+    }
+    // Slide 3 (Detail) - Abstract
+    else if (i === 2) {
+      textPos = 'middle';
+      badgePos = 'bottom-right';
+    }
+
+    return {
+      image: img,
+      text: storyData.captions[i] || "",
+      type: slideTypes[i],
+      textPosition: textPos,
+      badgePosition: badgePos
+    };
+  });
 
   return {
     slides,

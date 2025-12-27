@@ -7,6 +7,7 @@ export interface StorySlide {
   text: string;
   type: 'problem' | 'belief' | 'twist' | 'principle' | 'process' | 'result' | 'insight' | 'cta';
   textPosition: 'top' | 'middle' | 'bottom';
+  badgePosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
 export interface StoryResult {

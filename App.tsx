@@ -110,6 +110,17 @@ const App: React.FC = () => {
     </button>
   );
 
+  // Helper for badge positioning class
+  const getBadgePositionClass = (pos: string) => {
+    switch(pos) {
+      case 'top-left': return 'top-4 left-4';
+      case 'top-right': return 'top-4 right-4';
+      case 'bottom-left': return 'bottom-4 left-4';
+      case 'bottom-right': return 'bottom-4 right-4';
+      default: return 'top-4 left-4';
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-zinc-800 py-4 px-8 sticky top-0 bg-zinc-950/80 backdrop-blur-md z-50 flex justify-between items-center">
@@ -203,9 +214,11 @@ const App: React.FC = () => {
                     <img src={slide.image} className="w-full h-full object-cover" alt={`Slide ${index + 1}`} />
                     
                     {/* Text Overlay - Positioned based on slide.textPosition */}
-                    <div className={`absolute w-[85%] ${
+                    <div className={`absolute w-[85%] transition-all duration-300 ${
                       slide.textPosition === 'top' 
                         ? 'top-8 left-1/2 -translate-x-1/2' 
+                        : slide.textPosition === 'middle'
+                        ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
                         : 'bottom-16 left-1/2 -translate-x-1/2'
                     }`}>
                       <div className="bg-white/90 backdrop-blur-sm text-black px-4 py-3 rounded-xl shadow-lg text-center font-semibold text-sm leading-snug">
@@ -213,8 +226,8 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Badge */}
-                    <div className="absolute top-4 right-4 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs font-bold uppercase text-white border border-white/20">
+                    {/* Badge - Dynamic Position */}
+                    <div className={`absolute ${getBadgePositionClass(slide.badgePosition)} px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs font-bold uppercase text-white border border-white/20 z-10`}>
                       {slide.type}
                     </div>
 
@@ -222,7 +235,7 @@ const App: React.FC = () => {
                     <a 
                       href={slide.image} 
                       download={`story-slide-${index+1}.png`}
-                      className="absolute bottom-4 right-4 p-3 bg-amber-500 text-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-4 right-4 p-3 bg-amber-500 text-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     </a>
