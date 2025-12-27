@@ -174,12 +174,12 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
     LIGHTING: Dim, moody, chiaroscuro.
     VIBE: Realization. ${techSpecs}`,
 
-    // Slide 4: Principle (Objects - RAW PHOTO, NO UI)
-    `High angle photo of a bed covered in clothes, hangers, and fabric swatches.
-    IMPORTANT: This is a raw direct photo of the bed, NOT a screenshot of a camera app. DO NOT include any UI, buttons, or text overlays.
-    VIEW: POV looking down at the bed.
-    LIGHTING: Natural daylight coming from a window.
-    VIBE: Creative planning, organizing, aesthetic mess. ${techSpecs}`,
+    // Slide 4: Principle (Shopping - Candid)
+    `Candid medium shot of the woman browsing clothes in a clothing store. Keep exact face.
+    ACTION: She is sorting through hangers on a rack, focused on fabrics.
+    ANGLE: Slightly from the side/behind, as if taken by a friend accompanying her.
+    ENVIRONMENT: Fashion store interior with blurred racks in background.
+    VIBE: Casual shopping trip, searching for the new style. ${techSpecs}`,
 
     // Slide 5: Process (Fitting Room Selfie)
     `Mirror Selfie in a Fitting Room. Keep exact face.
@@ -211,8 +211,8 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   ];
 
   // 3. Execute Generations
-  // Note: Slide 4 is index 3, pass false for useRefImage
-  const promises = prompts.map((p, i) => generateSlideImage(p, i !== 3));
+  // All slides now feature the person, so we use the ref image for all.
+  const promises = prompts.map((p) => generateSlideImage(p, true));
   
   const responses = await Promise.all(promises);
 
@@ -236,25 +236,14 @@ export const generateStylistStory = async (base64Image: string): Promise<StoryRe
   
   // STRATEGY: 
   // Text Bottom -> Badge Top Left (Safest for selfies where face is center-top)
-  // Text Top -> Badge Bottom Right (For object shots)
   
   const slides: StorySlide[] = images.map((img, i) => {
     let textPos: StorySlide['textPosition'] = 'bottom';
     let badgePos: StorySlide['badgePosition'] = 'top-left';
 
-    // Special case for Slide 4 (Bed/Objects) - Text Top, Badge Bottom looks better for flat lays
-    if (i === 3) {
-      textPos = 'top';
-      badgePos = 'bottom-right';
-    } 
-    // Slide 2 (Close up) - Face is very high, keep Text Bottom, Badge Top Left
-    else if (i === 1) {
-       textPos = 'bottom';
-       badgePos = 'top-left';
-    }
     // Slide 3 (Twist/Detail) - User requested Text Bottom. 
     // Image prompt was adjusted to keep face in top half.
-    else if (i === 2) {
+    if (i === 2) {
       textPos = 'bottom'; 
       badgePos = 'top-right';
     }
