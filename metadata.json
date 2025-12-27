@@ -1,0 +1,7 @@
+{
+  "name": "Banana Studio Pro",
+  "description": "Advanced AI image generation and editing suite powered by Gemini models. Change subjects in photos while keeping outfits, generate 4K images with custom aspect ratios, and perform deep visual analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
