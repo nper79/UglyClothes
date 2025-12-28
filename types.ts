@@ -10,6 +10,18 @@ export interface StorySlide {
   badgePosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
+export interface StoryDraft {
+  slides: {
+    type: string;
+    caption: string;
+    visualPrompt: string; // The technical prompt for the image generator
+  }[];
+  storyData: {
+    name: string;
+    styleType: string;
+  };
+}
+
 export interface StoryResult {
   slides: StorySlide[];
   storyData: {
@@ -26,7 +38,8 @@ export interface DualResult {
 export interface AppState {
   originalImage: string | null;
   processedImage: string | null; // For single image results (edit/generate)
-  storyResult: StoryResult | null; // For the stylist story
+  currentDraft: StoryDraft | null; // NEW: The intermediate draft state
+  storyResult: StoryResult | null; // For the final stylist story
   loading: boolean;
   error: string | null;
   activeTab: 'story' | 'edit' | 'generate' | 'analyze';

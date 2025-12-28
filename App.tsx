@@ -5,10 +5,11 @@ import {
   AppTabs, 
   AppState, 
   ImageSize, 
-  AspectRatio 
+  AspectRatio
 } from './types';
 import { 
-  generateStylistStory, 
+  createStoryDraft,
+  renderStoryFromDraft,
   editImageWithPrompt, 
   generateImage, 
   analyzeImage, 
@@ -23,11 +24,13 @@ const IconPlus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor
 const IconSearch = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
 const IconUpload = () => <svg className="w-12 h-12 text-amber-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>;
 const IconDownload = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+const IconRefresh = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     originalImage: null,
     processedImage: null,
+    currentDraft: null,
     storyResult: null,
     loading: false,
     error: null,
@@ -55,12 +58,19 @@ const App: React.FC = () => {
           ...prev, 
           originalImage: reader.result as string, 
           processedImage: null, 
+          currentDraft: null,
           storyResult: null,
           analysisResult: null 
         }));
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const generateDraft = async (sourceImage: string) => {
+    setStatusMessage("Analyzing vibe & writing captions...");
+    const draft = await createStoryDraft(sourceImage);
+    setState(prev => ({ ...prev, currentDraft: draft, loading: false }));
   };
 
   const handleAction = async () => {
@@ -70,7 +80,7 @@ const App: React.FC = () => {
       return;
     }
 
-    setState(prev => ({ ...prev, loading: true, error: null, processedImage: null, storyResult: null, analysisResult: null }));
+    setState(prev => ({ ...prev, loading: true, error: null }));
     setStatusMessage("");
 
     try {
@@ -79,20 +89,26 @@ const App: React.FC = () => {
           let sourceImage = state.originalImage;
           
           if (!sourceImage) {
-            setStatusMessage("Generating base persona (Average Jane)...");
+            setStatusMessage("Generating base persona...");
             try {
               sourceImage = await generateAveragePersona();
-              // Update state so the user sees the generated persona immediately
               setState(prev => ({ ...prev, originalImage: sourceImage }));
             } catch (err) {
-              throw new Error("Failed to generate base persona. Please try uploading a photo.");
+              throw new Error("Failed to generate base persona.");
             }
           }
 
-          setStatusMessage("Designing wardrobe & writing story...");
-          const story = await generateStylistStory(sourceImage);
-          setState(prev => ({ ...prev, storyResult: story }));
+          if (state.currentDraft) {
+            // STEP 2: Render
+            setStatusMessage("Rendering story slides (this may take a minute)...");
+            const story = await renderStoryFromDraft(state.currentDraft, sourceImage);
+            setState(prev => ({ ...prev, storyResult: story }));
+          } else {
+             // STEP 1: Draft
+            await generateDraft(sourceImage);
+          }
           break;
+
         case AppTabs.EDIT:
           if (!state.originalImage) throw new Error("Please upload an image first.");
           const editResult = await editImageWithPrompt(state.originalImage, state.prompt);
@@ -116,23 +132,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRegenerateDraft = async () => {
+     if (!state.originalImage) return;
+     setState(prev => ({ ...prev, loading: true, error: null }));
+     try {
+        await generateDraft(state.originalImage);
+     } catch (err: any) {
+        setState(prev => ({ ...prev, error: err.message, loading: false }));
+     }
+  };
+
   const downloadAllSlides = async () => {
     if (!state.storyResult) return;
-    
     setZipping(true);
     try {
       const zip = new JSZip();
       const folder = zip.folder("banana-studio-story");
-      
       state.storyResult.slides.forEach((slide, index) => {
-        // Base64 string looks like "data:image/png;base64,..."
         const base64Data = slide.image.split(',')[1];
         folder?.file(`slide-${index + 1}-${slide.type}.png`, base64Data, { base64: true });
       });
-
       const content = await zip.generateAsync({ type: "blob" });
-      
-      // Create download link
       const url = URL.createObjectURL(content);
       const a = document.createElement("a");
       a.href = url;
@@ -150,7 +170,14 @@ const App: React.FC = () => {
 
   const TabButton = ({ id, label, icon: Icon }: { id: any, label: string, icon: any }) => (
     <button
-      onClick={() => setState(prev => ({ ...prev, activeTab: id, processedImage: null, storyResult: null, analysisResult: null }))}
+      onClick={() => setState(prev => ({ 
+        ...prev, 
+        activeTab: id, 
+        processedImage: null, 
+        currentDraft: null, // Reset draft on tab change
+        storyResult: null, 
+        analysisResult: null 
+      }))}
       className={`flex items-center gap-2 px-6 py-3 transition-all duration-200 border-b-2 font-medium ${
         state.activeTab === id 
           ? 'border-amber-500 text-amber-500 bg-amber-500/10' 
@@ -162,7 +189,6 @@ const App: React.FC = () => {
     </button>
   );
 
-  // Helper for badge positioning class
   const getBadgePositionClass = (pos: string) => {
     switch(pos) {
       case 'top-left': return 'top-4 left-4';
@@ -173,10 +199,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Determine if the main action button should be enabled
   const isButtonEnabled = () => {
     if (state.loading) return false;
-    // Allow generate story without image (we will create one)
     if (state.activeTab === AppTabs.STORY) return true;
     if (state.activeTab === AppTabs.GENERATE) return true;
     return !!state.originalImage;
@@ -233,19 +257,45 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {state.activeTab === AppTabs.STORY && (
-              <div className="text-zinc-400 text-sm leading-relaxed">
-                <p><strong>Stylist Mode:</strong> Creates a complete 8-slide makeover story.</p>
-                <ul className="list-disc ml-5 mt-2 space-y-1">
-                  <li><strong>Slide 1-2:</strong> The Problem & Belief (Before)</li>
-                  <li><strong>Slide 3-5:</strong> The Twist & Process (Theory/Testing)</li>
-                  <li><strong>Slide 6-8:</strong> The Result & Insight (After)</li>
-                </ul>
-                {!state.originalImage && (
-                  <p className="mt-4 text-amber-500 text-xs font-semibold">
-                    * No image? We'll generate an average-looking persona for you.
-                  </p>
-                )}
+            {state.activeTab === AppTabs.STORY && !state.storyResult && (
+              <div className="flex flex-col gap-4">
+                 
+                 {/* DRAFT REVIEW MODE */}
+                 {state.currentDraft && !state.loading && (
+                    <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-700/50 space-y-3">
+                       <div className="flex items-center justify-between">
+                          <h3 className="text-amber-500 text-xs font-bold uppercase tracking-wider">Preview Captions & Prompts</h3>
+                          <button 
+                             onClick={handleRegenerateDraft}
+                             className="text-xs text-zinc-400 hover:text-white flex items-center gap-1"
+                          >
+                             <IconRefresh /> Regenerate
+                          </button>
+                       </div>
+                       <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                          {state.currentDraft.slides.map((s, i) => (
+                             <div key={i} className="p-3 bg-zinc-950 rounded-lg border border-zinc-800 flex flex-col gap-2">
+                                <div className="text-sm text-zinc-200 font-medium">
+                                  <span className="text-amber-500/80 mr-2">Slide {i+1}</span>
+                                  {s.caption}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 font-mono bg-zinc-900 p-2 rounded border border-zinc-800/50 leading-relaxed break-words">
+                                  <span className="text-zinc-600 font-bold uppercase tracking-wider block mb-1">Visual Prompt:</span>
+                                  {s.visualPrompt}
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+                 )}
+
+                 <div className="text-zinc-400 text-xs leading-relaxed">
+                    {!state.originalImage && (
+                       <p className="text-amber-500 font-semibold mb-2">
+                         * No image? We'll generate an average-looking persona for you.
+                       </p>
+                    )}
+                 </div>
               </div>
             )}
 
@@ -254,7 +304,14 @@ const App: React.FC = () => {
               disabled={!isButtonEnabled()}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-xl font-bold text-zinc-950 transition-all flex items-center justify-center gap-2"
             >
-              {state.loading ? (statusMessage || "Processing...") : "Generate Makeover Story"}
+              {state.loading 
+                 ? (statusMessage || "Processing...") 
+                 : state.currentDraft && state.activeTab === AppTabs.STORY
+                 ? "Render Story Images (Final)"
+                 : state.activeTab === AppTabs.STORY
+                 ? "Generate Case Study Draft"
+                 : "Generate Result"
+              }
             </button>
 
             {state.error && <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm">{state.error}</div>}
@@ -290,12 +347,10 @@ const App: React.FC = () => {
               </div>
             ) : state.storyResult ? (
               <div className="w-full h-full flex items-center overflow-x-auto pb-4 gap-6 px-4">
-                 {/* Story Slides Container */}
                 {state.storyResult.slides.map((slide, index) => (
                   <div key={index} className="flex-shrink-0 relative w-[300px] h-[533px] bg-black rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl group">
                     <img src={slide.image} className="w-full h-full object-cover" alt={`Slide ${index + 1}`} />
                     
-                    {/* Text Overlay - Positioned based on slide.textPosition */}
                     <div className={`absolute w-[85%] transition-all duration-300 ${
                       slide.textPosition === 'top' 
                         ? 'top-8 left-1/2 -translate-x-1/2' 
@@ -308,12 +363,10 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Badge - Dynamic Position */}
                     <div className={`absolute ${getBadgePositionClass(slide.badgePosition)} px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs font-bold uppercase text-white border border-white/20 z-10`}>
                       {slide.type}
                     </div>
 
-                    {/* Download Button */}
                     <a 
                       href={slide.image} 
                       download={`story-slide-${index+1}.png`}
@@ -329,7 +382,10 @@ const App: React.FC = () => {
             ) : state.analysisResult ? (
               <div className="max-w-2xl w-full glass p-8 rounded-3xl border border-zinc-800 text-zinc-300 whitespace-pre-wrap">{state.analysisResult}</div>
             ) : (
-              <div className="text-zinc-600 text-center">No results to display. Upload an image to start the transformation.</div>
+              <div className="text-zinc-600 text-center flex flex-col items-center">
+                 <p className="mb-2">No results to display.</p>
+                 {state.activeTab === AppTabs.STORY && !state.currentDraft && <p className="text-xs text-zinc-500">Click "Generate Case Study Draft" to start.</p>}
+              </div>
             )}
           </div>
         </div>
